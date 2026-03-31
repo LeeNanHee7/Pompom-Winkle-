@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "SiteSettings": {
+      "title": "Site Settings",
+      "description": "Global settings for the website including brand information and theme.",
+      "type": "object",
+      "properties": {
+        "brandName": { "type": "string", "description": "The name of the brand." },
+        "heroTitle": { "type": "string", "description": "Main title on the home page." },
+        "heroSubtitle": { "type": "string", "description": "Subtitle on the home page." },
+        "aboutText": { "type": "string", "description": "Brand philosophy and story." },
+        "contactEmail": { "type": "string", "format": "email" },
+        "instagramUrl": { "type": "string", "format": "uri" },
+        "kakaoUrl": { "type": "string", "format": "uri" }
+      },
+      "required": ["brandName", "heroTitle"]
+    },
+    "CollectionItem": {
+      "title": "Collection Item",
+      "description": "A high-end pet dress in the collection.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string", "format": "uri" },
+        "price": { "type": "number" },
+        "category": { "type": "string", "enum": ["Dress", "Accessory", "Special"] },
+        "order": { "type": "integer", "description": "Display order." }
+      },
+      "required": ["name", "imageUrl", "category"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "A blog post or notice.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string", "description": "Markdown content." },
+        "category": { "type": "string", "enum": ["Blog", "Notice"] },
+        "imageUrl": { "type": "string", "format": "uri" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "author": { "type": "string" }
+      },
+      "required": ["title", "content", "category", "createdAt"]
+    },
+    "CustomOrder": {
+      "title": "Custom Order",
+      "description": "A request for a custom pet dress.",
+      "type": "object",
+      "properties": {
+        "customerName": { "type": "string" },
+        "customerEmail": { "type": "string", "format": "email" },
+        "petName": { "type": "string" },
+        "dimensions": { "type": "string", "description": "Neck, Chest, Length, etc." },
+        "request": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Consulting", "In Progress", "Completed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customerName", "customerEmail", "petName", "dimensions", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/settings/site": { "schema": "SiteSettings", "description": "Global site settings." },
+    "/collection": { "schema": "CollectionItem", "description": "Pet dress collection." },
+    "/posts": { "schema": "Post", "description": "Blog posts and notices." },
+    "/orders": { "schema": "CustomOrder", "description": "Custom order requests." }
+  }
+}

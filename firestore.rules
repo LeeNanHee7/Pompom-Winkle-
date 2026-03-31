@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: settings/site
+    // Fields: brandName, heroTitle, heroSubtitle, aboutText, contactEmail, instagramUrl, kakaoUrl
+    //
+    // Collection: collection
+    // Fields: name, description, imageUrl, price, category, order
+    //
+    // Collection: posts
+    // Fields: title, content, category, imageUrl, createdAt, author
+    //
+    // Collection: orders
+    // Fields: customerName, customerEmail, petName, dimensions, request, status, createdAt
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "nanhee717@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidSiteSettings(data) {
+      return data.brandName is string && data.brandName.size() > 0 && data.brandName.size() < 100 &&
+             data.heroTitle is string && data.heroTitle.size() < 200 &&
+             (!('heroSubtitle' in data) || (data.heroSubtitle is string && data.heroSubtitle.size() < 500)) &&
+             (!('aboutText' in data) || (data.aboutText is string && data.aboutText.size() < 5000)) &&
+             (!('contactEmail' in data) || (data.contactEmail is string && data.contactEmail.size() < 100)) &&
+             (!('instagramUrl' in data) || (data.instagramUrl is string && data.instagramUrl.size() < 500)) &&
+             (!('kakaoUrl' in data) || (data.kakaoUrl is string && data.kakaoUrl.size() < 500));
+    }
+
+    function isValidCollectionItem(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.imageUrl is string && data.imageUrl.size() < 1000 &&
+             data.category in ['Dress', 'Accessory', 'Special'] &&
+             (!('description' in data) || (data.description is string && data.description.size() < 1000)) &&
+             (!('price' in data) || (data.price is number)) &&
+             (!('order' in data) || (data.order is int));
+    }
+
+    function isValidPost(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 20000 &&
+             data.category in ['Blog', 'Notice'] &&
+             data.createdAt is string &&
+             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
+             (!('author' in data) || (data.author is string && data.author.size() < 100));
+    }
+
+    function isValidOrder(data) {
+      return data.customerName is string && data.customerName.size() > 0 && data.customerName.size() < 100 &&
+             data.customerEmail is string && data.customerEmail.size() > 0 && data.customerEmail.size() < 100 &&
+             data.petName is string && data.petName.size() > 0 && data.petName.size() < 100 &&
+             data.dimensions is string && data.dimensions.size() > 0 && data.dimensions.size() < 1000 &&
+             data.createdAt is string &&
+             (!('request' in data) || (data.request is string && data.request.size() < 2000)) &&
+             (!('status' in data) || (data.status in ['Pending', 'Consulting', 'In Progress', 'Completed']));
+    }
+
+    // Rules
+    match /settings/site {
+      allow read: if true;
+      allow write: if isAdmin() && isValidSiteSettings(request.resource.data);
+    }
+
+    match /collection/{itemId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidCollectionItem(request.resource.data);
+    }
+
+    match /posts/{postId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidPost(request.resource.data);
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAdmin();
+      allow create: if isValidOrder(request.resource.data);
+      allow update: if isAdmin() && isValidOrder(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+  }
+}
