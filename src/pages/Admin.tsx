@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { db, collection, onSnapshot, setDoc, doc, addDoc, updateDoc, deleteDoc, query, orderBy, OperationType, handleFirestoreError } from '../firebase';
+import { supabase } from '../supabase';
 import { SiteSettings, CollectionItem, Post, CustomOrder } from '../types';
 import { toast } from 'sonner';
 import { Settings, Image as ImageIcon, FileText, ShoppingBag, Plus, Trash2, Edit2, Save, X, CheckCircle, Clock } from 'lucide-react';
@@ -14,35 +14,61 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'site'), (doc) => {
-      if (doc.exists()) setSettings(doc.data() as SiteSettings);
-    });
+    const fetchData = async () => {
+      setLoading(true);
+      
+      // Fetch Settings
+      const { data: settingsData } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('id', 'site')
+        .single();
+      if (settingsData) setSettings(settingsData as SiteSettings);
 
-    const unsubCollection = onSnapshot(query(collection(db, 'collection'), orderBy('order', 'asc')), (snapshot) => {
-      setCollectionItems(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as CollectionItem)));
-    });
+      // Fetch Collection
+      const { data: collectionData } = await supabase
+        .from('collection')
+        .select('*')
+        .order('order', { ascending: true });
+      if (collectionData) setCollectionItems(collectionData as CollectionItem[]);
 
-    const unsubPosts = onSnapshot(query(collection(db, 'posts'), orderBy('createdAt', 'desc')), (snapshot) => {
-      setPosts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Post)));
-    });
+      // Fetch Posts
+      const { data: postsData } = await supabase
+        .from('posts')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (postsData) setPosts(postsData as Post[]);
 
-    const unsubOrders = onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc')), (snapshot) => {
-      setOrders(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as CustomOrder)));
+      // Fetch Orders
+      const { data: ordersData } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (ordersData) setOrders(ordersData as CustomOrder[]);
+
       setLoading(false);
-    });
+    };
+
+    fetchData();
+
+    // Set up real-time subscriptions
+    const settingsSub = supabase.channel('admin_settings').on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, fetchData).subscribe();
+    const collectionSub = supabase.channel('admin_collection').on('postgres_changes', { event: '*', schema: 'public', table: 'collection' }, fetchData).subscribe();
+    const postsSub = supabase.channel('admin_posts').on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, fetchData).subscribe();
+    const ordersSub = supabase.channel('admin_orders').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchData).subscribe();
 
     return () => {
-      unsubSettings();
-      unsubCollection();
-      unsubPosts();
-      unsubOrders();
+      settingsSub.unsubscribe();
+      collectionSub.unsubscribe();
+      postsSub.unsubscribe();
+      ordersSub.unsubscribe();
     };
   }, []);
 
   const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const newSettings: SiteSettings = {
+    const newSettings = {
       brandName: formData.get('brandName') as string,
       heroTitle: formData.get('heroTitle') as string,
       heroSubtitle: formData.get('heroSubtitle') as string,
@@ -53,10 +79,13 @@ export default function Admin() {
     };
 
     try {
-      await setDoc(doc(db, 'settings', 'site'), newSettings);
+      const { error } = await supabase
+        .from('settings')
+        .upsert({ id: 'site', ...newSettings });
+      if (error) throw error;
       toast.success('Site settings updated successfully');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'settings/site');
+    } catch (error: any) {
+      console.error('Settings error:', error);
       toast.error('Failed to update settings');
     }
   };
@@ -74,23 +103,25 @@ export default function Admin() {
     };
 
     try {
-      await addDoc(collection(db, 'collection'), newItem);
+      const { error } = await supabase.from('collection').insert(newItem);
+      if (error) throw error;
       toast.success('Item added to collection');
       (e.target as HTMLFormElement).reset();
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'collection');
+    } catch (error: any) {
+      console.error('Collection error:', error);
       toast.error('Failed to add item');
     }
   };
 
-  const handleDeleteItem = async (id: string, coll: string) => {
+  const handleDeleteItem = async (id: string, table: string) => {
     if (!confirm('Are you sure you want to delete this item?')) return;
     try {
-      await deleteDoc(doc(db, coll, id));
+      const { error } = await supabase.from(table).delete().eq('id', id);
+      if (error) throw error;
       toast.success('Item deleted');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `${coll}/${id}`);
-      toast.error('Failed to delete item');
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      toast.error(`Failed to delete item: ${error.message || 'Unknown error'}`);
     }
   };
 
@@ -102,27 +133,28 @@ export default function Admin() {
       content: formData.get('content') as string,
       category: formData.get('category') as any,
       imageUrl: formData.get('imageUrl') as string,
-      createdAt: new Date().toISOString(),
       author: 'Admin',
     };
 
     try {
-      await addDoc(collection(db, 'posts'), newPost);
+      const { error } = await supabase.from('posts').insert(newPost);
+      if (error) throw error;
       toast.success('Post published');
       (e.target as HTMLFormElement).reset();
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'posts');
+    } catch (error: any) {
+      console.error('Post error:', error);
       toast.error('Failed to publish post');
     }
   };
 
   const handleUpdateOrderStatus = async (id: string, status: string) => {
     try {
-      await updateDoc(doc(db, 'orders', id), { status });
+      const { error } = await supabase.from('orders').update({ status }).eq('id', id);
+      if (error) throw error;
       toast.success('Order status updated');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `orders/${id}`);
-      toast.error('Failed to update order status');
+    } catch (error: any) {
+      console.error('Update error:', error);
+      toast.error(`Failed to update order status: ${error.message || 'Unknown error'}`);
     }
   };
 

@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { db, collection, onSnapshot } from '../firebase';
+import { supabase } from '../supabase';
 import { useState, useEffect } from 'react';
 import { SiteSettings } from '../types';
 import { Star, Heart, Sparkles, ShieldCheck } from 'lucide-react';
@@ -8,11 +8,33 @@ export default function About() {
   const [settings, setSettings] = useState<SiteSettings | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'settings'), (snapshot) => {
-      const siteDoc = snapshot.docs.find(doc => doc.id === 'site');
-      if (siteDoc) setSettings(siteDoc.data() as SiteSettings);
-    });
-    return () => unsubscribe();
+    const fetchSettings = async () => {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('id', 'site')
+        .single();
+      
+      if (error) {
+        console.error('Error fetching settings:', error);
+      } else {
+        setSettings(data as SiteSettings);
+      }
+    };
+
+    fetchSettings();
+
+    // Real-time subscription
+    const subscription = supabase
+      .channel('about_settings_channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.site' }, () => {
+        fetchSettings();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const features = [

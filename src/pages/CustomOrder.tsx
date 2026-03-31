@@ -2,7 +2,7 @@ import { motion } from 'motion/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { db, addDoc, collection, OperationType, handleFirestoreError } from '../firebase';
+import { supabase } from '../supabase';
 import { toast } from 'sonner';
 import { Ruler, Send, CheckCircle2, Info } from 'lucide-react';
 import { useState } from 'react';
@@ -28,7 +28,7 @@ export default function CustomOrder() {
   const onSubmit = async (data: OrderFormData) => {
     setIsSubmitting(true);
     try {
-      // Submit to Formspree
+      // 1. Submit to Formspree
       const formspreeResponse = await fetch('https://formspree.io/f/mlgobrjz', {
         method: 'POST',
         headers: {
@@ -39,22 +39,30 @@ export default function CustomOrder() {
       });
 
       if (!formspreeResponse.ok) {
-        throw new Error('Formspree submission failed');
+        console.warn('Formspree submission failed, but continuing with Supabase...');
       }
 
-      // Also save to Firestore as backup/admin record
-      await addDoc(collection(db, 'orders'), {
-        ...data,
-        status: 'Pending',
-        createdAt: new Date().toISOString(),
-      });
+      // 2. Submit to Supabase
+      const { error: supabaseError } = await supabase
+        .from('orders')
+        .insert([
+          {
+            ...data,
+            status: 'Pending',
+            created_at: new Date().toISOString(),
+          }
+        ]);
+
+      if (supabaseError) {
+        throw supabaseError;
+      }
       
       setIsSuccess(true);
-      toast.success('맞춤 제작 문의가 성공적으로 접수되었습니다.');
+      toast.success('맞춤 제작 문의가 Supabase에 성공적으로 접수되었습니다.');
       reset();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Submission error:', error);
-      toast.error('문의 접수 중 오류가 발생했습니다. 다시 시도해주세요.');
+      toast.error(`문의 접수 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`);
     } finally {
       setIsSubmitting(false);
     }

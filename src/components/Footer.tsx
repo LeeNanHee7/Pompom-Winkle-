@@ -2,6 +2,7 @@ import { Instagram, MessageCircle, Mail, MapPin, Phone, Loader2 } from 'lucide-r
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { supabase } from '../supabase';
 
 export default function Footer() {
   const [email, setEmail] = useState('');
@@ -13,7 +14,8 @@ export default function Footer() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch('https://formspree.io/f/mlgobrjz', {
+      // 1. Submit to Formspree
+      const formspreeResponse = await fetch('https://formspree.io/f/mlgobrjz', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -22,15 +24,24 @@ export default function Footer() {
         body: JSON.stringify({ email, type: 'Newsletter Subscription' })
       });
 
-      if (response.ok) {
-        toast.success('뉴스레터 구독 신청이 완료되었습니다!');
-        setEmail('');
-      } else {
-        throw new Error('Submission failed');
+      if (!formspreeResponse.ok) {
+        console.warn('Formspree newsletter submission failed');
       }
-    } catch (error) {
+
+      // 2. Submit to Supabase
+      const { error: supabaseError } = await supabase
+        .from('newsletter_subscriptions')
+        .insert([{ email, created_at: new Date().toISOString() }]);
+
+      if (supabaseError) {
+        throw supabaseError;
+      }
+
+      toast.success('뉴스레터 구독 신청이 Supabase에 완료되었습니다!');
+      setEmail('');
+    } catch (error: any) {
       console.error('Newsletter error:', error);
-      toast.error('구독 신청 중 오류가 발생했습니다. 다시 시도해주세요.');
+      toast.error(`구독 신청 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`);
     } finally {
       setIsSubmitting(false);
     }

@@ -1,43 +1,40 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { auth, signInWithPopup, googleProvider, signOut, onAuthStateChanged, User } from '../firebase';
+import { supabase } from '../supabase';
+import { User } from '@supabase/supabase-js';
 import { Menu, X, User as UserIcon, LogOut, Settings, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
+import AuthModal from './AuthModal';
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login');
   const location = useLocation();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
-    return () => unsubscribe();
-  }, []);
-
-  const handleLogin = async () => {
-    setIsLoggingIn(true);
-    try {
-      await signInWithPopup(auth, googleProvider);
-      toast.success('로그인에 성공했습니다.');
-    } catch (error: any) {
-      console.error('Login failed:', error);
-      if (error.code === 'auth/unauthorized-domain') {
-        toast.error('이 도메인은 Firebase 승인 도메인에 등록되어 있지 않습니다. Firebase 콘솔에서 도메인을 추가해 주세요.');
-      } else if (error.code === 'auth/popup-blocked') {
-        toast.error('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해 주세요.');
-      } else {
-        toast.error(`로그인 실패: ${error.message}`);
-      }
-    } finally {
-      setIsLoggingIn(false);
-    }
+  const openAuthModal = (mode: 'login' | 'signup') => {
+    setAuthModalMode(mode);
+    setIsAuthModalOpen(true);
   };
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
       toast.info('로그아웃 되었습니다.');
     } catch (error) {
       console.error('Logout failed:', error);
@@ -88,21 +85,30 @@ export default function Navbar() {
                 <button onClick={handleLogout} className="p-2 hover:bg-red-50 rounded-full transition-colors group">
                   <LogOut className="w-5 h-5 text-ink/50 group-hover:text-red-500" />
                 </button>
-                <img src={user.photoURL || ''} alt="Profile" className="w-8 h-8 rounded-full border border-pastel-purple/30" />
+                <div className="w-8 h-8 rounded-full border border-pastel-purple/30 overflow-hidden bg-pastel-purple/10 flex items-center justify-center">
+                  {user.user_metadata.avatar_url ? (
+                    <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <UserIcon className="w-4 h-4 text-pastel-purple" />
+                  )}
+                </div>
               </div>
             ) : (
-              <button
-                onClick={handleLogin}
-                disabled={isLoggingIn}
-                className="flex items-center space-x-2 px-4 py-2 rounded-full border border-pastel-purple text-pastel-purple hover:bg-pastel-purple hover:text-white transition-all text-sm font-medium disabled:opacity-50"
-              >
-                {isLoggingIn ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => openAuthModal('login')}
+                  className="text-sm font-medium text-ink/70 hover:text-pastel-purple transition-colors"
+                >
+                  Login
+                </button>
+                <button
+                  onClick={() => openAuthModal('signup')}
+                  className="flex items-center space-x-2 px-6 py-2.5 rounded-full bg-pastel-purple text-white hover:bg-pastel-purple/90 transition-all shadow-lg shadow-pastel-purple/20 text-sm font-bold"
+                >
                   <UserIcon className="w-4 h-4" />
-                )}
-                <span>{isLoggingIn ? 'Logging in...' : 'Login'}</span>
-              </button>
+                  <span>Sign Up</span>
+                </button>
+              </div>
             )}
           </div>
 
@@ -143,14 +149,20 @@ export default function Navbar() {
                 </Link>
               ))}
               {!user && (
-                <button
-                  onClick={() => { handleLogin(); setIsMenuOpen(false); }}
-                  disabled={isLoggingIn}
-                  className="w-full text-left px-3 py-4 text-base font-medium text-pastel-purple flex items-center space-x-2 disabled:opacity-50"
-                >
-                  {isLoggingIn && <Loader2 className="w-4 h-4 animate-spin" />}
-                  <span>{isLoggingIn ? 'Logging in...' : 'Login'}</span>
-                </button>
+                <div className="space-y-2 pt-4">
+                  <button
+                    onClick={() => { openAuthModal('login'); setIsMenuOpen(false); }}
+                    className="w-full text-center px-3 py-4 text-base font-medium text-ink/70 border border-pastel-purple/20 rounded-2xl"
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={() => { openAuthModal('signup'); setIsMenuOpen(false); }}
+                    className="w-full text-center px-3 py-4 text-base font-medium text-white bg-pastel-purple rounded-2xl shadow-lg shadow-pastel-purple/20"
+                  >
+                    Sign Up
+                  </button>
+                </div>
               )}
               {user && (
                 <button
@@ -164,6 +176,12 @@ export default function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+        initialMode={authModalMode}
+      />
     </nav>
   );
 }

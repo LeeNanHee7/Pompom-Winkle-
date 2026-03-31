@@ -24,7 +24,8 @@ export interface Post {
   content: string;
   category: 'Blog' | 'Notice';
   imageUrl?: string;
-  createdAt: string;
+  createdAt?: string;
+  created_at?: string;
   author?: string;
 }
 
@@ -36,7 +37,8 @@ export interface CustomOrder {
   dimensions: string;
   request?: string;
   status: 'Pending' | 'Consulting' | 'In Progress' | 'Completed';
-  createdAt: string;
+  createdAt?: string;
+  created_at?: string;
 }
 
 export interface UserProfile {

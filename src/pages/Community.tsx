@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { db, collection, onSnapshot, query, orderBy } from '../firebase';
+import { supabase } from '../supabase';
 import { useState, useEffect } from 'react';
 import { Post } from '../types';
 import ReactMarkdown from 'react-markdown';
@@ -12,12 +12,33 @@ export default function Community() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post)));
+    const fetchPosts = async () => {
+      const { data, error } = await supabase
+        .from('posts')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching posts:', error);
+      } else {
+        setPosts(data as Post[]);
+      }
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+
+    fetchPosts();
+
+    // Real-time subscription
+    const subscription = supabase
+      .channel('posts_channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+        fetchPosts();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const filteredPosts = category === 'All' ? posts : posts.filter(p => p.category === category);

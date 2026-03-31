@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
-import { db, collection, onSnapshot, query, limit, orderBy } from '../firebase';
+import { supabase } from '../supabase';
 import { useState, useEffect } from 'react';
 import { CollectionItem, SiteSettings } from '../types';
 import { ArrowRight, Star, Heart } from 'lucide-react';
@@ -10,19 +10,55 @@ export default function Home() {
   const [bestItems, setBestItems] = useState<CollectionItem[]>([]);
 
   useEffect(() => {
-    const unsubscribeSettings = onSnapshot(collection(db, 'settings'), (snapshot) => {
-      const siteDoc = snapshot.docs.find(doc => doc.id === 'site');
-      if (siteDoc) setSettings(siteDoc.data() as SiteSettings);
-    });
+    const fetchSettings = async () => {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('id', 'site')
+        .single();
+      
+      if (error) {
+        console.error('Error fetching settings:', error);
+      } else {
+        setSettings(data as SiteSettings);
+      }
+    };
 
-    const q = query(collection(db, 'collection'), orderBy('order', 'asc'), limit(3));
-    const unsubscribeItems = onSnapshot(q, (snapshot) => {
-      setBestItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CollectionItem)));
-    });
+    const fetchBestItems = async () => {
+      const { data, error } = await supabase
+        .from('collection')
+        .select('*')
+        .order('order', { ascending: true })
+        .limit(3);
+      
+      if (error) {
+        console.error('Error fetching best items:', error);
+      } else {
+        setBestItems(data as CollectionItem[]);
+      }
+    };
+
+    fetchSettings();
+    fetchBestItems();
+
+    // Real-time subscriptions
+    const settingsSubscription = supabase
+      .channel('settings_channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.site' }, () => {
+        fetchSettings();
+      })
+      .subscribe();
+
+    const collectionSubscription = supabase
+      .channel('home_collection_channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'collection' }, () => {
+        fetchBestItems();
+      })
+      .subscribe();
 
     return () => {
-      unsubscribeSettings();
-      unsubscribeItems();
+      settingsSubscription.unsubscribe();
+      collectionSubscription.unsubscribe();
     };
   }, []);
 

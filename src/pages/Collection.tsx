@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { db, collection, onSnapshot, query, orderBy } from '../firebase';
+import { supabase } from '../supabase';
 import { useState, useEffect } from 'react';
 import { CollectionItem } from '../types';
 import { Heart, Search, Filter } from 'lucide-react';
@@ -10,12 +10,33 @@ export default function Collection() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'collection'), orderBy('order', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CollectionItem)));
+    const fetchCollection = async () => {
+      const { data, error } = await supabase
+        .from('collection')
+        .select('*')
+        .order('order', { ascending: true });
+      
+      if (error) {
+        console.error('Error fetching collection:', error);
+      } else {
+        setItems(data as CollectionItem[]);
+      }
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+
+    fetchCollection();
+
+    // Real-time subscription
+    const subscription = supabase
+      .channel('collection_channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'collection' }, () => {
+        fetchCollection();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const categories = ['All', 'Special', 'Dress', 'Accessory'];
