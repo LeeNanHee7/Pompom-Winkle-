@@ -1,12 +1,14 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { auth, signInWithPopup, googleProvider, signOut, onAuthStateChanged, User } from '../firebase';
-import { Menu, X, User as UserIcon, LogOut, Settings } from 'lucide-react';
+import { Menu, X, User as UserIcon, LogOut, Settings, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -15,18 +17,31 @@ export default function Navbar() {
   }, []);
 
   const handleLogin = async () => {
+    setIsLoggingIn(true);
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+      toast.success('로그인에 성공했습니다.');
+    } catch (error: any) {
       console.error('Login failed:', error);
+      if (error.code === 'auth/unauthorized-domain') {
+        toast.error('이 도메인은 Firebase 승인 도메인에 등록되어 있지 않습니다. Firebase 콘솔에서 도메인을 추가해 주세요.');
+      } else if (error.code === 'auth/popup-blocked') {
+        toast.error('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해 주세요.');
+      } else {
+        toast.error(`로그인 실패: ${error.message}`);
+      }
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      toast.info('로그아웃 되었습니다.');
     } catch (error) {
       console.error('Logout failed:', error);
+      toast.error('로그아웃 중 오류가 발생했습니다.');
     }
   };
 
@@ -78,10 +93,15 @@ export default function Navbar() {
             ) : (
               <button
                 onClick={handleLogin}
-                className="flex items-center space-x-2 px-4 py-2 rounded-full border border-pastel-purple text-pastel-purple hover:bg-pastel-purple hover:text-white transition-all text-sm font-medium"
+                disabled={isLoggingIn}
+                className="flex items-center space-x-2 px-4 py-2 rounded-full border border-pastel-purple text-pastel-purple hover:bg-pastel-purple hover:text-white transition-all text-sm font-medium disabled:opacity-50"
               >
-                <UserIcon className="w-4 h-4" />
-                <span>Login</span>
+                {isLoggingIn ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <UserIcon className="w-4 h-4" />
+                )}
+                <span>{isLoggingIn ? 'Logging in...' : 'Login'}</span>
               </button>
             )}
           </div>
@@ -125,9 +145,11 @@ export default function Navbar() {
               {!user && (
                 <button
                   onClick={() => { handleLogin(); setIsMenuOpen(false); }}
-                  className="w-full text-left px-3 py-4 text-base font-medium text-pastel-purple"
+                  disabled={isLoggingIn}
+                  className="w-full text-left px-3 py-4 text-base font-medium text-pastel-purple flex items-center space-x-2 disabled:opacity-50"
                 >
-                  Login
+                  {isLoggingIn && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <span>{isLoggingIn ? 'Logging in...' : 'Login'}</span>
                 </button>
               )}
               {user && (

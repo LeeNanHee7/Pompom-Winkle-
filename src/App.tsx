@@ -8,6 +8,7 @@ import CustomOrder from './pages/CustomOrder';
 import Community from './pages/Community';
 import Admin from './pages/Admin';
 import ProtectedRoute from './components/ProtectedRoute';
+import ScrollToTop from './components/ScrollToTop';
 import { useEffect, useState } from 'react';
 import { auth, onAuthStateChanged, User } from './firebase';
 
@@ -33,6 +34,7 @@ export default function App() {
 
   return (
     <Router>
+      <ScrollToTop />
       <Toaster position="top-center" richColors />
       <Routes>
         <Route path="/" element={<Layout />}>
