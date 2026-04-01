@@ -13,9 +13,16 @@ import {
   Dog,
   Camera,
   Loader2,
-  Package
+  Package,
+  Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+declare global {
+  interface Window {
+    daum: any;
+  }
+}
 
 type Section = 'profile' | 'cart' | 'orders' | 'wishlist' | 'reviews';
 
@@ -121,6 +128,7 @@ export default function MyPage() {
 
 function ProfileSection({ user, setUser }: { user: User, setUser: (user: User) => void }) {
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     full_name: user.user_metadata.full_name || '',
     phone: user.user_metadata.phone || '',
@@ -161,6 +169,62 @@ function ProfileSection({ user, setUser }: { user: User, setUser: (user: User) =
     }
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('파일 크기는 2MB 이하여야 합니다.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      // Upload image to 'avatars' bucket
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // Update user metadata
+      const { data, error: updateError } = await supabase.auth.updateUser({
+        data: { avatar_url: publicUrl }
+      });
+
+      if (updateError) throw updateError;
+      if (data.user) setUser(data.user);
+      toast.success('프로필 사진이 업데이트되었습니다.');
+    } catch (error: any) {
+      console.error('Error uploading avatar:', error);
+      toast.error('사진 업로드 중 오류가 발생했습니다. (avatars 버킷이 있는지 확인해 주세요)');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleAddressSearch = () => {
+    new window.daum.Postcode({
+      oncomplete: (data: any) => {
+        setFormData(prev => ({
+          ...prev,
+          zipcode: data.zonecode,
+          address: data.address
+        }));
+      }
+    }).open();
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -171,15 +235,24 @@ function ProfileSection({ user, setUser }: { user: User, setUser: (user: User) =
       <div className="flex flex-col md:flex-row items-center gap-8">
         <div className="relative group">
           <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-pastel-purple/20 bg-pastel-purple/5 flex items-center justify-center">
-            {user.user_metadata.avatar_url ? (
+            {uploading ? (
+              <Loader2 className="w-8 h-8 animate-spin text-pastel-purple" />
+            ) : user.user_metadata.avatar_url ? (
               <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
             ) : (
               <UserIcon className="w-12 h-12 text-pastel-purple/40" />
             )}
           </div>
-          <button className="absolute bottom-0 right-0 p-2 bg-pastel-purple text-white rounded-full shadow-lg hover:scale-110 transition-transform">
+          <label className="absolute bottom-0 right-0 p-2 bg-pastel-purple text-white rounded-full shadow-lg hover:scale-110 transition-transform cursor-pointer">
             <Camera className="w-4 h-4" />
-          </button>
+            <input 
+              type="file" 
+              className="hidden" 
+              accept="image/*"
+              onChange={handleAvatarUpload}
+              disabled={uploading}
+            />
+          </label>
         </div>
         <div className="text-center md:text-left">
           <h2 className="text-2xl font-serif font-bold text-ink">{formData.full_name || '사용자'}</h2>
@@ -231,9 +304,13 @@ function ProfileSection({ user, setUser }: { user: User, setUser: (user: User) =
                   value={formData.zipcode}
                   onChange={handleChange}
                   placeholder="우편번호"
+                  readOnly
                   className="w-24 px-4 py-3 rounded-2xl bg-ivory/50 border border-pastel-purple/10 focus:outline-none focus:border-pastel-purple text-sm"
                 />
-                <button className="px-4 py-2 bg-pastel-purple/10 text-pastel-purple text-xs font-bold rounded-xl hover:bg-pastel-purple/20 transition-colors">
+                <button 
+                  onClick={handleAddressSearch}
+                  className="px-4 py-2 bg-pastel-purple/10 text-pastel-purple text-xs font-bold rounded-xl hover:bg-pastel-purple/20 transition-colors"
+                >
                   주소 찾기
                 </button>
               </div>
