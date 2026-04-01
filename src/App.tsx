@@ -6,6 +6,7 @@ import About from './pages/About';
 import Collection from './pages/Collection';
 import CustomOrder from './pages/CustomOrder';
 import Community from './pages/Community';
+import MyPage from './pages/MyPage';
 import Admin from './pages/Admin';
 import ProtectedRoute from './components/ProtectedRoute';
 import ScrollToTop from './components/ScrollToTop';
@@ -52,6 +53,14 @@ export default function App() {
           <Route path="collection" element={<Collection />} />
           <Route path="custom-order" element={<CustomOrder />} />
           <Route path="community" element={<Community />} />
+          <Route 
+            path="mypage" 
+            element={
+              <ProtectedRoute adminOnly={false}>
+                <MyPage />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="admin/*" 
             element={

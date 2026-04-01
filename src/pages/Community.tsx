@@ -7,7 +7,7 @@ import { Calendar, User, ChevronRight, MessageSquare, Bell } from 'lucide-react'
 
 export default function Community() {
   const [posts, setPosts] = useState<Post[]>([]);
-  const [category, setCategory] = useState<'All' | 'Blog' | 'Notice'>('All');
+  const [category, setCategory] = useState<'All' | 'Blog' | 'Notice' | 'QnA'>('All');
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -81,7 +81,7 @@ export default function Community() {
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-ink uppercase tracking-widest">Categories</h3>
               <div className="flex flex-col space-y-2">
-                {(['All', 'Blog', 'Notice'] as const).map((cat) => (
+                {(['All', 'Blog', 'Notice', 'QnA'] as const).map((cat) => (
                   <button
                     key={cat}
                     onClick={() => { setCategory(cat); setSelectedPost(null); }}

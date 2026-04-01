@@ -78,6 +78,12 @@ export default function Navbar() {
               
               {user ? (
                 <div className="flex items-center space-x-4">
+                  <Link 
+                    to="/mypage" 
+                    className="text-sm font-medium text-ink/70 hover:text-pastel-purple transition-colors"
+                  >
+                    My Page
+                  </Link>
                   {isAdmin && (
                     <Link to="/admin" className="p-2 hover:bg-pastel-purple/10 rounded-full transition-colors">
                       <Settings className="w-5 h-5 text-pastel-purple" />
@@ -166,12 +172,21 @@ export default function Navbar() {
                   </div>
                 )}
                 {user && (
-                  <button
-                    onClick={() => { handleLogout(); setIsMenuOpen(false); }}
-                    className="w-full text-left px-3 py-4 text-base font-medium text-red-500"
-                  >
-                    Logout
-                  </button>
+                  <div className="space-y-2 pt-4">
+                    <Link
+                      to="/mypage"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="block px-3 py-4 text-base font-medium text-ink/70 border-b border-pastel-purple/10"
+                    >
+                      My Page
+                    </Link>
+                    <button
+                      onClick={() => { handleLogout(); setIsMenuOpen(false); }}
+                      className="w-full text-left px-3 py-4 text-base font-medium text-red-500"
+                    >
+                      Logout
+                    </button>
+                  </div>
                 )}
               </div>
             </motion.div>
