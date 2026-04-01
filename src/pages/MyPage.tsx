@@ -41,9 +41,16 @@ export default function MyPage() {
 
   const handleSectionChange = (section: Section) => {
     setActiveSection(section);
-    // Scroll to content on mobile
+    // Scroll to content on mobile with an offset
     if (window.innerWidth < 1024 && contentRef.current) {
-      contentRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const navbarHeight = 80; // Height of the sticky navbar
+      const elementPosition = contentRef.current.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - navbarHeight - 20; // Extra 20px for breathing room
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
     }
   };
 
