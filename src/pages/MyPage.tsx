@@ -106,7 +106,7 @@ export default function MyPage() {
               animate={{ opacity: 1, y: 0 }}
               className="bg-white rounded-[40px] p-8 md:p-12 shadow-2xl shadow-pastel-purple/5 border border-pastel-purple/10 min-h-[600px]"
             >
-              {activeSection === 'profile' && <ProfileSection user={user} />}
+              {activeSection === 'profile' && <ProfileSection user={user} setUser={setUser} />}
               {activeSection === 'cart' && <PlaceholderSection title="장바구니" icon={ShoppingCart} />}
               {activeSection === 'orders' && <PlaceholderSection title="주문 내역" icon={Package} />}
               {activeSection === 'wishlist' && <PlaceholderSection title="찜 리스트" icon={Heart} />}
@@ -119,7 +119,53 @@ export default function MyPage() {
   );
 }
 
-function ProfileSection({ user }: { user: User }) {
+function ProfileSection({ user, setUser }: { user: User, setUser: (user: User) => void }) {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    full_name: user.user_metadata.full_name || '',
+    phone: user.user_metadata.phone || '',
+    zipcode: user.user_metadata.zipcode || '',
+    address: user.user_metadata.address || '',
+    address_detail: user.user_metadata.address_detail || '',
+    pet_name: user.user_metadata.pet_name || '',
+    pet_breed: user.user_metadata.pet_breed || '',
+  });
+
+  useEffect(() => {
+    setFormData({
+      full_name: user.user_metadata.full_name || '',
+      phone: user.user_metadata.phone || '',
+      zipcode: user.user_metadata.zipcode || '',
+      address: user.user_metadata.address || '',
+      address_detail: user.user_metadata.address_detail || '',
+      pet_name: user.user_metadata.pet_name || '',
+      pet_breed: user.user_metadata.pet_breed || '',
+    });
+  }, [user]);
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        data: formData
+      });
+
+      if (error) throw error;
+      if (data.user) setUser(data.user);
+      toast.success('정보가 성공적으로 저장되었습니다.');
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      toast.error(error.message || '정보 저장 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
   return (
     <div className="space-y-12">
       <div className="flex flex-col md:flex-row items-center gap-8">
@@ -136,7 +182,7 @@ function ProfileSection({ user }: { user: User }) {
           </button>
         </div>
         <div className="text-center md:text-left">
-          <h2 className="text-2xl font-serif font-bold text-ink">{user.user_metadata.full_name || '사용자'}</h2>
+          <h2 className="text-2xl font-serif font-bold text-ink">{formData.full_name || '사용자'}</h2>
           <p className="text-ink/40 text-sm">{user.email}</p>
         </div>
       </div>
@@ -151,7 +197,9 @@ function ProfileSection({ user }: { user: User }) {
               <label className="text-[10px] font-bold text-ink/40 ml-1">이름</label>
               <input 
                 type="text" 
-                defaultValue={user.user_metadata.full_name}
+                name="full_name"
+                value={formData.full_name}
+                onChange={handleChange}
                 className="w-full px-4 py-3 rounded-2xl bg-ivory/50 border border-pastel-purple/10 focus:outline-none focus:border-pastel-purple text-sm"
               />
             </div>
@@ -159,6 +207,9 @@ function ProfileSection({ user }: { user: User }) {
               <label className="text-[10px] font-bold text-ink/40 ml-1">연락처</label>
               <input 
                 type="tel" 
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
                 placeholder="010-0000-0000"
                 className="w-full px-4 py-3 rounded-2xl bg-ivory/50 border border-pastel-purple/10 focus:outline-none focus:border-pastel-purple text-sm"
               />
@@ -176,6 +227,9 @@ function ProfileSection({ user }: { user: User }) {
               <div className="flex gap-2">
                 <input 
                   type="text" 
+                  name="zipcode"
+                  value={formData.zipcode}
+                  onChange={handleChange}
                   placeholder="우편번호"
                   className="w-24 px-4 py-3 rounded-2xl bg-ivory/50 border border-pastel-purple/10 focus:outline-none focus:border-pastel-purple text-sm"
                 />
@@ -185,11 +239,17 @@ function ProfileSection({ user }: { user: User }) {
               </div>
               <input 
                 type="text" 
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
                 placeholder="기본 주소"
                 className="w-full px-4 py-3 rounded-2xl bg-ivory/50 border border-pastel-purple/10 focus:outline-none focus:border-pastel-purple text-sm mt-2"
               />
               <input 
                 type="text" 
+                name="address_detail"
+                value={formData.address_detail}
+                onChange={handleChange}
                 placeholder="상세 주소"
                 className="w-full px-4 py-3 rounded-2xl bg-ivory/50 border border-pastel-purple/10 focus:outline-none focus:border-pastel-purple text-sm mt-2"
               />
@@ -206,6 +266,9 @@ function ProfileSection({ user }: { user: User }) {
               <label className="text-[10px] font-bold text-ink/40 ml-1">반려견 이름</label>
               <input 
                 type="text" 
+                name="pet_name"
+                value={formData.pet_name}
+                onChange={handleChange}
                 placeholder="강아지 이름을 입력하세요"
                 className="w-full px-4 py-3 rounded-2xl bg-ivory/50 border border-pastel-purple/10 focus:outline-none focus:border-pastel-purple text-sm"
               />
@@ -214,6 +277,9 @@ function ProfileSection({ user }: { user: User }) {
               <label className="text-[10px] font-bold text-ink/40 ml-1">반려견 견종</label>
               <input 
                 type="text" 
+                name="pet_breed"
+                value={formData.pet_breed}
+                onChange={handleChange}
                 placeholder="예: 푸들, 말티즈"
                 className="w-full px-4 py-3 rounded-2xl bg-ivory/50 border border-pastel-purple/10 focus:outline-none focus:border-pastel-purple text-sm"
               />
@@ -224,10 +290,11 @@ function ProfileSection({ user }: { user: User }) {
 
       <div className="pt-8 border-t border-pastel-purple/10">
         <button 
-          onClick={() => toast.success('정보가 저장되었습니다.')}
-          className="w-full py-4 bg-pastel-purple text-white rounded-2xl font-bold shadow-xl shadow-pastel-purple/20 hover:bg-pastel-purple/90 transition-all"
+          onClick={handleSave}
+          disabled={loading}
+          className="w-full py-4 bg-pastel-purple text-white rounded-2xl font-bold shadow-xl shadow-pastel-purple/20 hover:bg-pastel-purple/90 transition-all flex items-center justify-center disabled:opacity-50"
         >
-          저장하기
+          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : '저장하기'}
         </button>
       </div>
     </div>
