@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabase';
 import { User } from '@supabase/supabase-js';
 import { motion } from 'motion/react';
@@ -30,6 +30,7 @@ export default function MyPage() {
   const [user, setUser] = useState<User | null>(null);
   const [activeSection, setActiveSection] = useState<Section>('profile');
   const [loading, setLoading] = useState(true);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -37,6 +38,14 @@ export default function MyPage() {
       setLoading(false);
     });
   }, []);
+
+  const handleSectionChange = (section: Section) => {
+    setActiveSection(section);
+    // Scroll to content on mobile
+    if (window.innerWidth < 1024 && contentRef.current) {
+      contentRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   if (loading) {
     return (
@@ -80,7 +89,7 @@ export default function MyPage() {
             {menuItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => setActiveSection(item.id as Section)}
+                onClick={() => handleSectionChange(item.id as Section)}
                 className={`w-full flex items-center p-6 rounded-3xl transition-all border ${
                   activeSection === item.id 
                     ? 'bg-white border-pastel-purple shadow-xl shadow-pastel-purple/5 scale-[1.02]' 
@@ -106,7 +115,7 @@ export default function MyPage() {
           </aside>
 
           {/* Content Area */}
-          <main className="lg:col-span-8">
+          <main className="lg:col-span-8" ref={contentRef}>
             <motion.div
               key={activeSection}
               initial={{ opacity: 0, y: 20 }}
